@@ -53,7 +53,7 @@ class LDAPSettings:
     defaults = {
         "ALWAYS_UPDATE_USER": True,
         "AUTHORIZE_ALL_USERS": False,
-        "BACKEND": "django_auth_ldap.adapters.python_ldap",
+        "BACKEND": "django_auth_ldap.adapters.ldap3",
         "BIND_AS_AUTHENTICATING_USER": False,
         "REFRESH_DN_ON_BIND": False,
         "BIND_DN": "",
@@ -125,7 +125,7 @@ class _LDAPConfig:
             adapter_path = getattr(
                 settings,
                 "AUTH_LDAP_BACKEND",
-                "django_auth_ldap.adapters.python_ldap",
+                "django_auth_ldap.adapters.ldap3",
             )
             cls._ldap_adapter = cls._load_adapter(adapter_path)
 

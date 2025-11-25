@@ -45,9 +45,9 @@ def check_ldap_backend_configured(app_configs, **kwargs):
             Warning(
                 "AUTH_LDAP_BACKEND is not configured",
                 hint=(
-                    "The LDAP backend will default to python-ldap. "
+                    "The LDAP backend will default to ldap3 (pure Python). "
                     "Set AUTH_LDAP_BACKEND explicitly to silence this warning. "
-                    'For ldap3 (pure Python): "django_auth_ldap.adapters.ldap3" '
+                    'For ldap3 (default): "django_auth_ldap.adapters.ldap3" '
                     'For python-ldap: "django_auth_ldap.adapters.python_ldap"'
                 ),
                 id="django_auth_ldap.W001",

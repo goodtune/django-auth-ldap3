@@ -5,51 +5,55 @@ to the new pluggable backend architecture.
 
 ## Overview
 
-Starting with this release, django-auth-ldap supports multiple LDAP libraries
-through a pluggable adapter architecture:
+Starting with this release, django-auth-ldap uses `ldap3` (pure Python) as the
+default LDAP library. This provides a simpler installation experience without
+requiring C compilation or OpenLDAP system libraries.
 
-- **ldap3**: A pure Python LDAP library (no compilation required)
-- **python-ldap**: The traditional C extension (requires OpenLDAP libraries)
+The package supports multiple LDAP libraries through a pluggable adapter
+architecture:
+
+- **ldap3**: A pure Python LDAP library (default, no compilation required)
+- **python-ldap**: The traditional C extension (optional, requires OpenLDAP)
 
 ## Breaking Changes
 
-**Dependencies**: The package no longer requires `python-ldap` by default. You
-must explicitly install the LDAP library you want to use.
+**Dependencies**: The package now requires `ldap3` by default instead of
+`python-ldap`. If you were using `python-ldap`, you'll need to explicitly
+install it and configure `AUTH_LDAP_BACKEND`.
 
 ## Migration Steps
 
 ### 1. Update Your Installation
 
-If you're currently using `python-ldap` and want to continue using it:
+For most users, simply upgrading will work:
+
+```bash
+pip install --upgrade django-auth-ldap
+```
+
+This will install `ldap3` automatically and use it as the default backend.
+
+If you want to continue using `python-ldap`:
 
 ```bash
 pip install django-auth-ldap[openldap]
 ```
 
-If you want to switch to `ldap3` (pure Python):
+### 2. Configure the Backend (Only if using python-ldap)
 
-```bash
-pip install django-auth-ldap[ldap3]
-```
-
-To install both for testing:
-
-```bash
-pip install django-auth-ldap[all]
-```
-
-### 2. Configure the Backend (Optional)
-
-By default, django-auth-ldap uses `python-ldap` for backward compatibility. If
-you want to use `ldap3` or want to be explicit about your choice, add the
+If you want to use `python-ldap` instead of the default `ldap3`, add the
 following to your Django settings:
 
 ```python
-# Use ldap3 (pure Python, recommended for Docker/containers)
-AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.ldap3'
-
-# Or use python-ldap (traditional, requires C extension)
+# Use python-ldap (traditional, requires C extension)
 AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.python_ldap'
+```
+
+If you're using `ldap3` (the default), no configuration is needed:
+
+```python
+# Optional: explicitly set ldap3 (this is the default)
+AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.ldap3'
 ```
 
 ### 3. Update Direct LDAP Imports (If Any)
@@ -79,7 +83,7 @@ scope = ldap_adapter.SCOPE_SUBTREE
 ### Short Form (Recommended)
 
 ```python
-# Use ldap3
+# Use ldap3 (default, pure Python)
 AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.ldap3'
 
 # Use python-ldap
@@ -124,7 +128,7 @@ issue a warning (django_auth_ldap.W001). To silence this warning, either:
 
 1. Explicitly set `AUTH_LDAP_BACKEND` in your settings:
    ```python
-   AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.python_ldap'
+   AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.ldap3'
    ```
 
 2. Or add the check ID to `SILENCED_SYSTEM_CHECKS`:
@@ -174,11 +178,11 @@ class MyLDAPTest(TestCase):
 Make sure you've installed the required LDAP library:
 
 ```bash
-# For python-ldap
-pip install python-ldap
-
-# For ldap3
+# For ldap3 (included by default)
 pip install ldap3
+
+# For python-ldap (optional)
+pip install python-ldap
 ```
 
 ### AttributeError: 'X' does not have attribute 'Y'

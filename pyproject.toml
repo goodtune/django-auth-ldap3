@@ -36,12 +36,12 @@ dynamic = ["version"]
 
 dependencies = [
     "Django>=4.2",
+    "ldap3>=2.9",
 ]
 
 [project.optional-dependencies]
-ldap3 = ["ldap3>=2.9"]
 openldap = ["python-ldap>=3.1"]
-all = ["ldap3>=2.9", "python-ldap>=3.1"]
+all = ["python-ldap>=3.1"]
 
 [project.urls]
 Homepage = "https://github.com/django-auth-ldap/django-auth-ldap"

@@ -1900,10 +1900,11 @@ class AdapterLoadingTest(TestCase):
         from django_auth_ldap.adapters.ldap3 import Adapter
         self.assertIsInstance(adapter, Adapter)
 
-    def test_default_adapter_is_python_ldap(self):
-        """Test that default adapter is python-ldap for backward compatibility."""
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3")
+    def test_default_adapter_is_ldap3(self):
+        """Test that ldap3 adapter can be loaded."""
         adapter = _LDAPConfig.get_ldap()
-        from django_auth_ldap.adapters.python_ldap import Adapter
+        from django_auth_ldap.adapters.ldap3 import Adapter
         self.assertIsInstance(adapter, Adapter)
 
     @_override_settings(AUTH_LDAP_BACKEND="nonexistent.module.Adapter")
