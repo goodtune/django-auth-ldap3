@@ -36,8 +36,29 @@ Install the package with pip:
 
     $ pip install django-auth-ldap
 
-It requires `python-ldap`_ >= 3.1. You'll need the `OpenLDAP`_ libraries and
-headers available on your system.
+By default, the package does not include any LDAP libraries. You must install
+one of the supported LDAP backends:
+
+**Using ldap3 (Pure Python, recommended for ease of installation):**
+
+.. code-block:: sh
+
+    $ pip install django-auth-ldap[ldap3]
+
+**Using python-ldap (Traditional C extension):**
+
+.. code-block:: sh
+
+    $ pip install django-auth-ldap[openldap]
+
+`python-ldap`_ requires the `OpenLDAP`_ libraries and headers available on your
+system.
+
+**Installing both backends:**
+
+.. code-block:: sh
+
+    $ pip install django-auth-ldap[all]
 
 To use the auth backend in a Django project, add
 ``'django_auth_ldap.backend.LDAPBackend'`` to ``AUTHENTICATION_BACKENDS``. Do
@@ -48,6 +69,24 @@ not add anything to ``INSTALLED_APPS``.
     AUTHENTICATION_BACKENDS = [
         'django_auth_ldap.backend.LDAPBackend',
     ]
+
+
+LDAP Backend Selection
+----------------------
+
+You can choose which LDAP library to use by setting ``AUTH_LDAP_BACKEND`` in
+your Django settings:
+
+.. code-block:: python
+
+    # Use ldap3 (pure Python)
+    AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.ldap3'
+
+    # Use python-ldap (requires C extension)
+    AUTH_LDAP_BACKEND = 'django_auth_ldap.adapters.python_ldap'
+
+If not specified, the default is ``django_auth_ldap.adapters.python_ldap`` for
+backward compatibility.
 
 ``LDAPBackend`` should work with custom user models, but it does assume that a
 database is present.

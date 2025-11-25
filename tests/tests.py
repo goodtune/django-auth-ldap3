@@ -1857,3 +1857,157 @@ class CustomGroupType(PosixGroupType):
             name = None
 
         return name
+
+
+class AdapterLoadingTest(TestCase):
+    """Tests for the LDAP adapter loading mechanism."""
+
+    def setUp(self):
+        super().setUp()
+        _LDAPConfig.reset()
+
+    def tearDown(self):
+        _LDAPConfig.reset()
+        super().tearDown()
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.python_ldap")
+    def test_load_python_ldap_adapter_short_form(self):
+        """Test loading python-ldap adapter using short form."""
+        adapter = _LDAPConfig.get_ldap()
+        from django_auth_ldap.adapters.python_ldap import Adapter
+        self.assertIsInstance(adapter, Adapter)
+
+    @_override_settings(
+        AUTH_LDAP_BACKEND="django_auth_ldap.adapters.python_ldap.Adapter"
+    )
+    def test_load_python_ldap_adapter_full_form(self):
+        """Test loading python-ldap adapter using full form."""
+        adapter = _LDAPConfig.get_ldap()
+        from django_auth_ldap.adapters.python_ldap import Adapter
+        self.assertIsInstance(adapter, Adapter)
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3")
+    def test_load_ldap3_adapter_short_form(self):
+        """Test loading ldap3 adapter using short form."""
+        adapter = _LDAPConfig.get_ldap()
+        from django_auth_ldap.adapters.ldap3 import Adapter
+        self.assertIsInstance(adapter, Adapter)
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3.Adapter")
+    def test_load_ldap3_adapter_full_form(self):
+        """Test loading ldap3 adapter using full form."""
+        adapter = _LDAPConfig.get_ldap()
+        from django_auth_ldap.adapters.ldap3 import Adapter
+        self.assertIsInstance(adapter, Adapter)
+
+    def test_default_adapter_is_python_ldap(self):
+        """Test that default adapter is python-ldap for backward compatibility."""
+        adapter = _LDAPConfig.get_ldap()
+        from django_auth_ldap.adapters.python_ldap import Adapter
+        self.assertIsInstance(adapter, Adapter)
+
+    @_override_settings(AUTH_LDAP_BACKEND="nonexistent.module.Adapter")
+    def test_load_nonexistent_adapter_raises_import_error(self):
+        """Test that loading a nonexistent adapter raises ImportError."""
+        with self.assertRaises(ImportError):
+            _LDAPConfig.get_ldap()
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.python_ldap.NonExistent")
+    def test_load_nonexistent_class_raises_attribute_error(self):
+        """Test that loading a nonexistent class raises AttributeError."""
+        with self.assertRaises(AttributeError):
+            _LDAPConfig.get_ldap()
+
+    def test_adapter_has_required_constants(self):
+        """Test that loaded adapter has required constants."""
+        adapter = _LDAPConfig.get_ldap()
+        # Scope constants
+        self.assertTrue(hasattr(adapter, 'SCOPE_BASE'))
+        self.assertTrue(hasattr(adapter, 'SCOPE_ONELEVEL'))
+        self.assertTrue(hasattr(adapter, 'SCOPE_SUBTREE'))
+        # Option constants
+        self.assertTrue(hasattr(adapter, 'OPT_REFERRALS'))
+        # Result type constants
+        self.assertTrue(hasattr(adapter, 'RES_SEARCH_ENTRY'))
+        self.assertTrue(hasattr(adapter, 'RES_SEARCH_RESULT'))
+        # Exception types
+        self.assertTrue(hasattr(adapter, 'LDAPError'))
+        self.assertTrue(hasattr(adapter, 'INVALID_CREDENTIALS'))
+        # Modules
+        self.assertTrue(hasattr(adapter, 'dn'))
+        self.assertTrue(hasattr(adapter, 'filter'))
+        self.assertTrue(hasattr(adapter, 'cidict'))
+
+    def test_adapter_dn_module_has_escape_dn_chars(self):
+        """Test that adapter dn module has escape_dn_chars function."""
+        adapter = _LDAPConfig.get_ldap()
+        self.assertTrue(hasattr(adapter.dn, 'escape_dn_chars'))
+        # Test that it escapes special characters
+        escaped = adapter.dn.escape_dn_chars("test,user")
+        self.assertIn("\\", escaped)
+
+    def test_adapter_filter_module_has_escape_filter_chars(self):
+        """Test that adapter filter module has escape_filter_chars function."""
+        adapter = _LDAPConfig.get_ldap()
+        self.assertTrue(hasattr(adapter.filter, 'escape_filter_chars'))
+        # Test that it escapes special characters
+        escaped = adapter.filter.escape_filter_chars("test*user")
+        self.assertIn("\\2a", escaped)
+
+    def test_adapter_cidict_module_creates_case_insensitive_dict(self):
+        """Test that adapter cidict module creates case-insensitive dicts."""
+        adapter = _LDAPConfig.get_ldap()
+        self.assertTrue(hasattr(adapter.cidict, 'cidict'))
+        ci = adapter.cidict.cidict()
+        ci['Test'] = 'value'
+        self.assertEqual(ci['test'], 'value')
+        self.assertEqual(ci['TEST'], 'value')
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3")
+    def test_ldap3_adapter_has_required_constants(self):
+        """Test that ldap3 adapter has required constants."""
+        adapter = _LDAPConfig.get_ldap()
+        # Scope constants
+        self.assertTrue(hasattr(adapter, 'SCOPE_BASE'))
+        self.assertTrue(hasattr(adapter, 'SCOPE_ONELEVEL'))
+        self.assertTrue(hasattr(adapter, 'SCOPE_SUBTREE'))
+        # Option constants
+        self.assertTrue(hasattr(adapter, 'OPT_REFERRALS'))
+        # Result type constants
+        self.assertTrue(hasattr(adapter, 'RES_SEARCH_ENTRY'))
+        self.assertTrue(hasattr(adapter, 'RES_SEARCH_RESULT'))
+        # Exception types
+        self.assertTrue(hasattr(adapter, 'LDAPError'))
+        self.assertTrue(hasattr(adapter, 'INVALID_CREDENTIALS'))
+        # Modules
+        self.assertTrue(hasattr(adapter, 'dn'))
+        self.assertTrue(hasattr(adapter, 'filter'))
+        self.assertTrue(hasattr(adapter, 'cidict'))
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3")
+    def test_ldap3_adapter_dn_module_has_escape_dn_chars(self):
+        """Test that ldap3 adapter dn module has escape_dn_chars function."""
+        adapter = _LDAPConfig.get_ldap()
+        self.assertTrue(hasattr(adapter.dn, 'escape_dn_chars'))
+        # Test that it escapes special characters
+        escaped = adapter.dn.escape_dn_chars("test,user")
+        self.assertIn("\\", escaped)
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3")
+    def test_ldap3_adapter_filter_module_has_escape_filter_chars(self):
+        """Test that ldap3 adapter filter module has escape_filter_chars function."""
+        adapter = _LDAPConfig.get_ldap()
+        self.assertTrue(hasattr(adapter.filter, 'escape_filter_chars'))
+        # Test that it escapes special characters
+        escaped = adapter.filter.escape_filter_chars("test*user")
+        self.assertIn("\\2a", escaped)
+
+    @_override_settings(AUTH_LDAP_BACKEND="django_auth_ldap.adapters.ldap3")
+    def test_ldap3_adapter_cidict_module_creates_case_insensitive_dict(self):
+        """Test that ldap3 adapter cidict module creates case-insensitive dicts."""
+        adapter = _LDAPConfig.get_ldap()
+        self.assertTrue(hasattr(adapter.cidict, 'cidict'))
+        ci = adapter.cidict.cidict()
+        ci['Test'] = 'value'
+        self.assertEqual(ci['test'], 'value')
+        self.assertEqual(ci['TEST'], 'value')
