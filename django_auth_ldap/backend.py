@@ -49,7 +49,6 @@ from functools import reduce
 
 import django.conf
 import django.dispatch
-import ldap
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -377,7 +376,7 @@ class _LDAPUser:
             user = self._user
         except self.AuthenticationFailed as e:
             logger.debug("Authentication failed for %s: %s", self._username, e)
-        except ldap.LDAPError as e:
+        except self.ldap.LDAPError as e:
             _report_error(
                 type(self.backend),
                 "authenticate",
@@ -403,7 +402,7 @@ class _LDAPUser:
                 try:
                     if self.dn is not None:
                         self._load_group_permissions()
-                except ldap.LDAPError as e:
+                except self.ldap.LDAPError as e:
                     _report_error(
                         type(self.backend),
                         "get_group_permissions",
@@ -430,7 +429,7 @@ class _LDAPUser:
         except self.AuthenticationFailed as e:
             # Mirroring groups can raise AuthenticationFailed
             logger.debug("Failed to populate user %s: %s", self._username, e)
-        except ldap.LDAPError as e:
+        except self.ldap.LDAPError as e:
             _report_error(
                 type(self.backend),
                 "populate_user",
@@ -493,7 +492,7 @@ class _LDAPUser:
             sticky = self.settings.BIND_AS_AUTHENTICATING_USER
 
             self._bind_as(self.dn, password, sticky=sticky)
-        except ldap.INVALID_CREDENTIALS:
+        except self.ldap.INVALID_CREDENTIALS:
             raise self.AuthenticationFailed("user DN/password rejected by LDAP server.")
         if (
             self._using_simple_bind_mode()
@@ -505,7 +504,7 @@ class _LDAPUser:
     def _load_user_attrs(self):
         if self.dn is not None:
             search = LDAPSearch(
-                self.dn, ldap.SCOPE_BASE, attrlist=self.settings.USER_ATTRLIST
+                self.dn, self.ldap.SCOPE_BASE, attrlist=self.settings.USER_ATTRLIST
             )
             results = search.execute(self.connection)
 
@@ -531,7 +530,7 @@ class _LDAPUser:
 
     def _construct_simple_user_dn(self):
         template = self.settings.USER_DN_TEMPLATE
-        username = ldap.dn.escape_dn_chars(self._username)
+        username = self.ldap.dn.escape_dn_chars(self._username)
         return template % {"user": username}
 
     def _search_for_user_dn(self):
@@ -551,7 +550,7 @@ class _LDAPUser:
 
             try:
                 results = search.execute(self.connection, {"user": self._username})
-            except ldap.LDAPError as e:
+            except self.ldap.LDAPError as e:
                 _report_error(
                     type(self.backend),
                     "search_for_user_dn",
@@ -782,7 +781,7 @@ class _LDAPUser:
             target_group_names = frozenset(
                 filter(None, self._get_groups().get_group_names())
             )
-        except ldap.LDAPError as e:
+        except self.ldap.LDAPError as e:
             _report_error(
                 type(self.backend),
                 context="mirror_groups",
