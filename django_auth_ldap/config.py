@@ -156,19 +156,16 @@ class _LDAPConfig:
             ImportError: If the adapter module cannot be found
             AttributeError: If the adapter class cannot be found
         """
-        # Check if this is a short form path (module without class name)
-        # Short form paths for built-in adapters: django_auth_ldap.adapters.xxx
-        # Full form paths: django_auth_ldap.adapters.xxx.Adapter
-        parts = adapter_path.split(".")
+        # Try to import as a module first (short form)
+        # If successful and the module has an 'Adapter' class, use it
+        try:
+            module = importlib.import_module(adapter_path)
+            if hasattr(module, "Adapter"):
+                return module.Adapter()
+        except ImportError:
+            pass
 
-        # If the path ends with a known adapter module name, append 'Adapter'
-        if (
-            adapter_path.startswith("django_auth_ldap.adapters.")
-            and len(parts) == 3
-        ):
-            adapter_path = f"{adapter_path}.Adapter"
-
-        # Split into module path and class name
+        # Otherwise, treat the last part as a class name (full form)
         module_path, class_name = adapter_path.rsplit(".", 1)
 
         try:
