@@ -50,6 +50,7 @@ from django_auth_ldap.config import (
     MemberDNGroupType,
     NestedMemberDNGroupType,
     PosixGroupType,
+    _LDAPConfig,
 )
 
 from .models import TestUser
@@ -152,6 +153,8 @@ class LDAPTest(TestCase):
     def setUp(self):
         super().setUp()
         cache.clear()
+        # Reset the adapter cache between tests to allow settings override to work
+        _LDAPConfig.reset()
 
     def test_options(self):
         self._init_settings(

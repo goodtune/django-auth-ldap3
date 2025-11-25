@@ -29,11 +29,10 @@ Please see the docstring on the backend module for more information, including
 notes on naming conventions.
 """
 
+import importlib
 import logging
 import pprint
 
-import ldap
-import ldap.filter
 from django.conf import settings
 from django.utils.tree import Node
 
@@ -54,6 +53,7 @@ class LDAPSettings:
     defaults = {
         "ALWAYS_UPDATE_USER": True,
         "AUTHORIZE_ALL_USERS": False,
+        "BACKEND": "django_auth_ldap.adapters.python_ldap",
         "BIND_AS_AUTHENTICATING_USER": False,
         "REFRESH_DN_ON_BIND": False,
         "BIND_DN": "",
@@ -103,21 +103,98 @@ class _LDAPConfig:
 
     logger = None
 
+    _ldap_adapter = None
     _ldap_configured = False
 
     @classmethod
     def get_ldap(cls, global_options=None):
         """
-        Returns the configured ldap module.
+        Returns the configured LDAP adapter.
+
+        The adapter is determined by the AUTH_LDAP_BACKEND setting:
+        - 'django_auth_ldap.adapters.ldap3' for the pure Python ldap3 library
+        - 'django_auth_ldap.adapters.python_ldap' for the traditional python-ldap
+
+        Args:
+            global_options: Optional dict of global LDAP options to apply
+
+        Returns:
+            An instance of BaseLDAPAdapter
         """
+        if cls._ldap_adapter is None:
+            adapter_path = getattr(
+                settings,
+                "AUTH_LDAP_BACKEND",
+                "django_auth_ldap.adapters.python_ldap",
+            )
+            cls._ldap_adapter = cls._load_adapter(adapter_path)
+
         # Apply global LDAP options once
         if not cls._ldap_configured and global_options is not None:
             for opt, value in global_options.items():
-                ldap.set_option(opt, value)
+                cls._ldap_adapter.set_option(opt, value)
 
             cls._ldap_configured = True
 
-        return ldap
+        return cls._ldap_adapter
+
+    @classmethod
+    def _load_adapter(cls, adapter_path):
+        """
+        Load an adapter class from the given path.
+
+        Supports both short form (e.g., 'django_auth_ldap.adapters.ldap3')
+        and full form (e.g., 'django_auth_ldap.adapters.ldap3.Adapter').
+
+        Args:
+            adapter_path: The dotted path to the adapter
+
+        Returns:
+            An instance of the adapter class
+
+        Raises:
+            ImportError: If the adapter module cannot be found
+            AttributeError: If the adapter class cannot be found
+        """
+        # Check if this is a short form path (module without class name)
+        # Short form paths for built-in adapters: django_auth_ldap.adapters.xxx
+        # Full form paths: django_auth_ldap.adapters.xxx.Adapter
+        parts = adapter_path.split(".")
+
+        # If the path ends with a known adapter module name, append 'Adapter'
+        if (
+            adapter_path.startswith("django_auth_ldap.adapters.")
+            and len(parts) == 3
+        ):
+            adapter_path = f"{adapter_path}.Adapter"
+
+        # Split into module path and class name
+        module_path, class_name = adapter_path.rsplit(".", 1)
+
+        try:
+            module = importlib.import_module(module_path)
+            adapter_class = getattr(module, class_name)
+            return adapter_class()
+        except ImportError as e:
+            raise ImportError(
+                f"Could not import LDAP adapter module '{module_path}'. "
+                f"Make sure the required library is installed. Error: {e}"
+            ) from e
+        except AttributeError as e:
+            raise AttributeError(
+                f"LDAP adapter module '{module_path}' does not have a "
+                f"'{class_name}' class. Error: {e}"
+            ) from e
+
+    @classmethod
+    def reset(cls):
+        """
+        Reset the cached adapter and configuration.
+
+        This is primarily useful for testing.
+        """
+        cls._ldap_adapter = None
+        cls._ldap_configured = False
 
     @classmethod
     def get_logger(cls):
@@ -224,7 +301,7 @@ class LDAPSearch:
             msgid = connection.search(
                 self.base_dn, self.scope, filterstr, self.attrlist
             )
-        except ldap.LDAPError as e:
+        except self.ldap.LDAPError as e:
             msgid = None
             logger.error(
                 "search('%s', %s, '%s') raised %s",
@@ -242,9 +319,9 @@ class LDAPSearch:
         """
         try:
             kind, results = connection.result(msgid)
-            if kind not in (ldap.RES_SEARCH_ENTRY, ldap.RES_SEARCH_RESULT):
+            if kind not in (self.ldap.RES_SEARCH_ENTRY, self.ldap.RES_SEARCH_RESULT):
                 results = []
-        except ldap.LDAPError as e:
+        except self.ldap.LDAPError as e:
             results = []
             logger.error("result(%s) raised %s", msgid, pprint.pformat(e))
 
@@ -443,11 +520,19 @@ class LDAPGroupType:
         return name
 
 
-ALLOWED_LDAP_MEMBERSHIP_EXCEPTIONS = (
-    ldap.UNDEFINED_TYPE,  # Attribute does not exist in LDAP schema.
-    ldap.NO_SUCH_ATTRIBUTE,  # Attribute does not exist in the entry.
-    ldap.NO_SUCH_OBJECT,  # Group does not exist.
-)
+def _get_allowed_ldap_membership_exceptions():
+    """
+    Returns a tuple of LDAP exceptions that are allowed during membership checks.
+
+    These exceptions indicate normal conditions (attribute doesn't exist,
+    entry doesn't exist, etc.) rather than actual errors.
+    """
+    ldap_adapter = _LDAPConfig.get_ldap()
+    return (
+        ldap_adapter.UNDEFINED_TYPE,  # Attribute does not exist in LDAP schema.
+        ldap_adapter.NO_SUCH_ATTRIBUTE,  # Attribute does not exist in the entry.
+        ldap_adapter.NO_SUCH_OBJECT,  # Group does not exist.
+    )
 
 
 class PosixGroupType(LDAPGroupType):
@@ -488,6 +573,7 @@ class PosixGroupType(LDAPGroupType):
         Returns True if the group is the user's primary group or if the user is
         listed in the group's memberUid attribute.
         """
+        allowed_exceptions = _get_allowed_ldap_membership_exceptions()
         try:
             user_uid = ldap_user.attrs["uid"][0]
 
@@ -495,7 +581,7 @@ class PosixGroupType(LDAPGroupType):
                 is_member = ldap_user.connection.compare_s(
                     group_dn, "memberUid", user_uid.encode()
                 )
-            except ALLOWED_LDAP_MEMBERSHIP_EXCEPTIONS:
+            except allowed_exceptions:
                 is_member = False
 
             if not is_member:
@@ -504,7 +590,7 @@ class PosixGroupType(LDAPGroupType):
                     is_member = ldap_user.connection.compare_s(
                         group_dn, "gidNumber", user_gid.encode()
                     )
-                except ALLOWED_LDAP_MEMBERSHIP_EXCEPTIONS:
+                except allowed_exceptions:
                     is_member = False
         except (KeyError, IndexError):
             is_member = False
@@ -536,11 +622,12 @@ class MemberDNGroupType(LDAPGroupType):
         return search.execute(ldap_user.connection)
 
     def is_member(self, ldap_user, group_dn):
+        allowed_exceptions = _get_allowed_ldap_membership_exceptions()
         try:
             result = ldap_user.connection.compare_s(
                 group_dn, self.member_attr, ldap_user.dn.encode()
             )
-        except ALLOWED_LDAP_MEMBERSHIP_EXCEPTIONS:
+        except allowed_exceptions:
             result = 0
 
         return result
