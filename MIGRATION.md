@@ -18,7 +18,7 @@ architecture:
 ## Breaking Changes
 
 **Dependencies**: The package now requires `ldap3` by default instead of
-`python-ldap`. If you were using `python-ldap`, you'll need to explicitly
+`python-ldap`. If you wish to continue using `python-ldap`, you'll need to explicitly
 install it and configure `AUTH_LDAP_BACKEND`.
 
 ## Migration Steps
